@@ -1,0 +1,29 @@
+#if DEBUG
+import Foundation
+import NtfyKit
+import UserNotifications
+
+/// Launch arguments for simulator runs and screenshots:
+/// `-seedServer http://localhost:8080 -seedTopics backups,alerts -openTopic alerts`
+@MainActor
+enum DebugSeed {
+    static func apply(to model: AppModel) async {
+        let defaults = UserDefaults.standard
+        guard let server = defaults.string(forKey: "seedServer").flatMap(URL.init(string:)) else { return }
+        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge, .provisional])
+        if !model.servers.servers.contains(server) {
+            try? model.servers.add(server, credential: nil)
+        }
+        let existing = Set(model.store.subscriptions().map(\.topic))
+        let tints = TopicTint.allCases
+        let symbols = Subscription.symbolChoices
+        for (index, topic) in (defaults.string(forKey: "seedTopics") ?? "").split(separator: ",").map(String.init).enumerated() where !existing.contains(topic) {
+            model.container.mainContext.insert(Subscription(baseURL: server, topic: topic, symbol: symbols[(index * 5 + 1) % symbols.count], tint: tints[(index * 3) % tints.count]))
+        }
+        try? model.container.mainContext.save()
+        if let topic = defaults.string(forKey: "openTopic"), model.router.selectedTopicKey == nil {
+            model.router.selectedTopicKey = topicKey(baseURL: server, topic: topic)
+        }
+    }
+}
+#endif
