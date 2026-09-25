@@ -9,7 +9,7 @@
 > **Unofficial.** Alai is an independent project. It isn't affiliated with or endorsed by the ntfy project. For the
 > official app, see [ntfy on the App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
 
-Instant push needs a server built from the [`apns` branch](https://github.com/linusr/ntfy/tree/apns) of the ntfy fork;
+Instant push needs the [Alai server](https://github.com/linusr/ntfy), a hard fork of ntfy with APNs support;
 other ntfy servers work through the live stream and background refresh.
 
 ## Features
@@ -25,7 +25,7 @@ other ntfy servers work through the live stream and background refresh.
 
 | Mode | When | Latency |
 |---|---|---|
-| APNs push | Server runs the fork with an APNs key for this app's team | Instant |
+| APNs push | Alai server with an APNs key for this app's team | Instant |
 | Live stream | App in the foreground | Instant |
 | Background refresh | App in the background, no APNs | iOS schedules it, from about 15 minutes to hours |
 
@@ -34,7 +34,7 @@ both paths never notify twice. Notifications on the iPhone are mirrored to the w
 
 ## Server compatibility
 
-| Feature | Fork (`apns` branch) | Upstream ntfy |
+| Feature | Alai server | Stock ntfy |
 |---|---|---|
 | Servers, sign-in, subscriptions, history, refresh | ✅ | ✅ |
 | Publishing, action buttons, attachments, markdown | ✅ | ✅ |
