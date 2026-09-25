@@ -3,7 +3,7 @@ import WidgetKit
 import NtfyKit
 
 @main
-struct NtfyWatchWidgets: WidgetBundle {
+struct AlaiWatchWidgets: WidgetBundle {
     var body: some Widget {
         LatestMessageComplication()
     }

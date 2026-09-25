@@ -18,10 +18,13 @@ public enum TopicStyle {
         }
     }
 
+    /// URL scheme the app registers for links from widgets.
+    public static let linkScheme = "alai"
+
     /// Link that opens a topic in the app, used by widgets.
     public static func topicLink(_ key: String) -> URL {
         var components = URLComponents()
-        components.scheme = "ntfy-app"
+        components.scheme = linkScheme
         components.host = "topic"
         components.queryItems = [URLQueryItem(name: "key", value: key)]
         return components.url!

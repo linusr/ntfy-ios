@@ -18,7 +18,7 @@ struct RecentMessagesView: View {
                     Text(error).font(.footnote).foregroundStyle(.red)
                 }
             }
-            .navigationTitle("ntfy")
+            .navigationTitle("Alai")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Refresh", systemImage: "arrow.clockwise") {

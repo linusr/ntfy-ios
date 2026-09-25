@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct NtfyApp: App {
+struct AlaiApp: App {
     @UIApplicationDelegateAdaptor private var delegate: AppDelegate
     @Environment(\.scenePhase) private var scenePhase
 

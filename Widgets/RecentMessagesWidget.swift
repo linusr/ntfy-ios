@@ -3,7 +3,7 @@ import WidgetKit
 import NtfyKit
 
 @main
-struct NtfyWidgets: WidgetBundle {
+struct AlaiWidgets: WidgetBundle {
     var body: some Widget {
         RecentMessagesWidget()
     }

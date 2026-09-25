@@ -1,8 +1,16 @@
-# ntfy for iOS and watchOS
+# Alai (அலை)
 
-A native iOS and watchOS client for self-hosted [ntfy](https://ntfy.sh) servers that deliver through Apple Push
-Notification service directly. It requires a server built from the [`apns` branch](https://github.com/linusr/ntfy/tree/apns)
-of the ntfy fork; servers without APNs still work, but messages only arrive when the app refreshes.
+<p align="center"><img src="App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="128" alt="Alai icon"></p>
+
+**A native iOS and watchOS client for self-hosted [ntfy](https://ntfy.sh) servers.**
+
+*Alai* is Tamil for "wave".
+
+> **Unofficial.** Alai is an independent project. It isn't affiliated with or endorsed by the ntfy project. For the
+> official app, see [ntfy on the App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
+
+Instant push needs a server built from the [`apns` branch](https://github.com/linusr/ntfy/tree/apns) of the ntfy fork;
+other ntfy servers work through the live stream and background refresh.
 
 ## Features
 
@@ -61,13 +69,13 @@ not currently proposed.
    apns-key-file: "/etc/ntfy/AuthKey_ABC123DEFG.p8"
    apns-key-id: "ABC123DEFG"
    apns-team-id: "DEF123GHIJ"
-   apns-bundle-id: "me.4vr.ntfy"
+   apns-bundle-id: "me.4vr.alai"
    apns-file: "/var/cache/ntfy/apns.db"
    ```
 4. Generate the Xcode project and open it:
    ```sh
    mise exec -- xcodegen generate
-   open Ntfy.xcodeproj
+   open Alai.xcodeproj
    ```
 
 Debug builds register with the APNs sandbox and Release builds (TestFlight, App Store) with production, matching the
@@ -83,6 +91,7 @@ Debug builds register with the APNs sandbox and Release builds (TestFlight, App 
 | `Widgets` | Home and Lock Screen widgets reading the snapshot the app writes to the app group |
 | `Watch` | watchOS app: receives servers and topics from the iPhone, then polls the servers directly |
 | `WatchWidgets` | Watch complications |
+| `Design/render-icon.swift` | Renders the app icon variants: `swift Design/render-icon.swift App/Resources/Assets.xcassets/AppIcon.appiconset` |
 
 The notification service extension never writes the app's database. It drops each message into an app-group inbox,
 which the app imports on launch, so the two processes never share a store.
@@ -91,7 +100,7 @@ which the app imports on launch, so the two processes never share a store.
 
 ```sh
 swift test --package-path Packages/NtfyKit
-xcodebuild -project Ntfy.xcodeproj -scheme Ntfy -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project Alai.xcodeproj -scheme Alai -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Debug builds accept launch arguments that add a server and topics without going through onboarding:
@@ -109,7 +118,7 @@ Background refresh does not run in the Simulator, which rejects task requests. O
 background, pause it in the Xcode debugger and run:
 
 ```
-e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"me.4vr.ntfy.refresh"]
+e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"me.4vr.alai.refresh"]
 ```
 
 `xcrun simctl push` delivers to Notification Center without running the notification service extension, so

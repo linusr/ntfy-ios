@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct NtfyWatchApp: App {
+struct AlaiWatchApp: App {
     @State private var store = WatchStore()
 
     var body: some Scene {

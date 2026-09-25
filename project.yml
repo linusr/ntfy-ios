@@ -1,4 +1,4 @@
-name: Ntfy
+name: Alai
 options:
   bundleIdPrefix: me.4vr
   deploymentTarget:
@@ -15,8 +15,8 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    APP_BUNDLE_ID: me.4vr.ntfy
-    APP_GROUP: group.me.4vr.ntfy
+    APP_BUNDLE_ID: me.4vr.alai
+    APP_GROUP: group.me.4vr.alai
     ENABLE_USER_SCRIPT_SANDBOXING: YES
   configs:
     Debug:
@@ -31,7 +31,7 @@ packages:
     path: Packages/NtfyKit
 
 targets:
-  Ntfy:
+  Alai:
     type: application
     platform: iOS
     sources:
@@ -40,7 +40,7 @@ targets:
       - package: NtfyKit
       - target: NotificationService
       - target: Widgets
-      - target: NtfyWatch
+      - target: AlaiWatch
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
@@ -49,7 +49,7 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: ntfy
+        CFBundleDisplayName: Alai
         NtfyAppGroup: $(APP_GROUP)
         NtfyPushEnvironment: $(PUSH_ENVIRONMENT)
         UILaunchScreen: {}
@@ -57,13 +57,13 @@ targets:
         BGTaskSchedulerPermittedIdentifiers: [$(APP_BUNDLE_ID).refresh]
         CFBundleURLTypes:
           - CFBundleURLName: $(APP_BUNDLE_ID)
-            CFBundleURLSchemes: [ntfy-app]
+            CFBundleURLSchemes: [alai]
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
     entitlements:
-      path: App/Ntfy.entitlements
+      path: App/Alai.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
         com.apple.security.application-groups: [$(APP_GROUP)]
@@ -82,7 +82,7 @@ targets:
     info:
       path: NotificationService/Info.plist
       properties:
-        CFBundleDisplayName: ntfy Notifications
+        CFBundleDisplayName: Alai Notifications
         NtfyAppGroup: $(APP_GROUP)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.usernotifications.service
@@ -105,7 +105,7 @@ targets:
     info:
       path: Widgets/Info.plist
       properties:
-        CFBundleDisplayName: ntfy Widgets
+        CFBundleDisplayName: Alai Widgets
         NtfyAppGroup: $(APP_GROUP)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
@@ -114,7 +114,7 @@ targets:
       properties:
         com.apple.security.application-groups: [$(APP_GROUP)]
 
-  NtfyWatch:
+  AlaiWatch:
     type: application
     platform: watchOS
     sources:
@@ -125,17 +125,17 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).watchkitapp
-        PRODUCT_NAME: ntfy
+        PRODUCT_NAME: Alai
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Watch/Info.plist
       properties:
-        CFBundleDisplayName: ntfy
+        CFBundleDisplayName: Alai
         WKApplication: true
         WKCompanionAppBundleIdentifier: $(APP_BUNDLE_ID)
         NtfyAppGroup: $(APP_GROUP)
     entitlements:
-      path: Watch/NtfyWatch.entitlements
+      path: Watch/AlaiWatch.entitlements
       properties:
         com.apple.security.application-groups: [$(APP_GROUP)]
 
@@ -152,7 +152,7 @@ targets:
     info:
       path: WatchWidgets/Info.plist
       properties:
-        CFBundleDisplayName: ntfy Complications
+        CFBundleDisplayName: Alai Complications
         NtfyAppGroup: $(APP_GROUP)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
@@ -162,10 +162,10 @@ targets:
         com.apple.security.application-groups: [$(APP_GROUP)]
 
 schemes:
-  Ntfy:
+  Alai:
     build:
       targets:
-        Ntfy: all
+        Alai: all
     test:
       targets:
         - package: NtfyKit/NtfyKitTests
