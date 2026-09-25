@@ -38,13 +38,13 @@ func render(_ variant: Variant) throws {
     guard let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0, space: space,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
 
-    // Background: ocean gradient (light), deep navy (dark), transparent (tinted, the system supplies the color)
+    // Background: blue gradient (light), deep navy (dark), transparent (tinted, the system supplies the color)
     switch variant {
     case .light:
-        let gradient = CGGradient(colorsSpace: space, colors: [color(0x5EEAD4), color(0x0D9488), color(0x0B4F71)] as CFArray, locations: [0, 0.5, 1])!
+        let gradient = CGGradient(colorsSpace: space, colors: [color(0x60A5FA), color(0x2563EB), color(0x1E3A8A)] as CFArray, locations: [0, 0.5, 1])!
         context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: s), end: CGPoint(x: s * 0.3, y: 0), options: [])
     case .dark:
-        let gradient = CGGradient(colorsSpace: space, colors: [color(0x10233A), color(0x05101C)] as CFArray, locations: [0, 1])!
+        let gradient = CGGradient(colorsSpace: space, colors: [color(0x111C33), color(0x060A14)] as CFArray, locations: [0, 1])!
         context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: s), end: CGPoint(x: 0, y: 0), options: [])
     case .tinted:
         break
@@ -53,7 +53,7 @@ func render(_ variant: Variant) throws {
     // Notification dot: a rising sun / signal above the waves
     let dotColor: CGColor = switch variant {
     case .light: color(0xFFFFFF)
-    case .dark: color(0x5EEAD4)
+    case .dark: color(0x93C5FD)
     case .tinted: color(0xFFFFFF)
     }
     let dotCenter = CGPoint(x: s * 0.5, y: s * 0.64)
@@ -72,8 +72,8 @@ func render(_ variant: Variant) throws {
         (s * 0.25, s * 0.055, 0.80, 1.00),
     ]
     let waveColor: CGColor = switch variant {
-    case .light: color(0xCCFBF1)
-    case .dark: color(0x2DD4BF)
+    case .light: color(0xDBEAFE)
+    case .dark: color(0x60A5FA)
     case .tinted: color(0xFFFFFF)
     }
     for band in waves {
