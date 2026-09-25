@@ -8,6 +8,8 @@ struct TopicListView: View {
     @Query(sort: \Subscription.createdAt) private var subscriptions: [Subscription]
     @State private var isAddingTopic = false
     @State private var isShowingSettings = false
+    @State private var isBrowsing = false
+    @Environment(ServerDirectory.self) private var servers
     @State private var pendingUnsubscribe: Subscription?
 
     private var sorted: [Subscription] {
@@ -49,6 +51,9 @@ struct TopicListView: View {
                 } actions: {
                     Button("Add Topic") { isAddingTopic = true }
                         .buttonStyle(.glassProminent)
+                    if servers.defaultServer != nil {
+                        Button("Browse Server Topics") { isBrowsing = true }
+                    }
                 }
             }
         }
@@ -62,6 +67,18 @@ struct TopicListView: View {
         }
         .sheet(isPresented: $isAddingTopic) { AddTopicView() }
         .sheet(isPresented: $isShowingSettings) { SettingsView() }
+        .sheet(isPresented: $isBrowsing) {
+            if let server = servers.defaultServer {
+                NavigationStack {
+                    BrowseTopicsView(server: server)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done", role: .confirm) { isBrowsing = false }
+                            }
+                        }
+                }
+            }
+        }
         .confirmationDialog(
             "Unsubscribe from \(pendingUnsubscribe?.title ?? "")?",
             isPresented: Binding(get: { pendingUnsubscribe != nil }, set: { if !$0 { pendingUnsubscribe = nil } }),

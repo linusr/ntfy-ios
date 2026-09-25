@@ -1,7 +1,6 @@
 #if DEBUG
 import Foundation
 import NtfyKit
-import UserNotifications
 
 /// Launch arguments for simulator runs and screenshots:
 /// `-seedServer http://localhost:8080 -seedUser ben -seedPassword pw -seedTopics backups,alerts -openTopic alerts`,
@@ -11,10 +10,10 @@ enum DebugSeed {
     static func apply(to model: AppModel) async {
         let defaults = UserDefaults.standard
         guard let server = defaults.string(forKey: "seedServer").flatMap(URL.init(string:)) else { return }
-        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge, .provisional])
         if !model.servers.servers.contains(server) {
             let credential = defaults.string(forKey: "seedUser").map { ServerCredential.basic(username: $0, password: defaults.string(forKey: "seedPassword") ?? "") }
             try? model.servers.add(server, credential: credential)
+            await model.importTopics(from: server)
         }
         let existing = Set(model.store.subscriptions().map(\.topic))
         let tints = TopicTint.allCases

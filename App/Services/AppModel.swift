@@ -34,11 +34,42 @@ final class AppModel {
             container.mainContext.insert(Subscription(baseURL: server, topic: topic, displayName: displayName, symbol: symbol, tint: tint))
             try? container.mainContext.save()
         }
-        await requestNotificationPermission()
         if let subscription = store.subscription(baseURL: server, topic: topic) {
             await refresh(subscription)
         }
         await subscriptionsChanged()
+        await requestNotificationPermission()
+    }
+
+    /// Subscribes to the topics the signed-in account already has on a server: its reservations and
+    /// the subscriptions synced from the ntfy web app. Returns how many topics were added.
+    @discardableResult
+    func importTopics(from server: URL) async -> Int {
+        guard servers.credential(for: server) != nil,
+              let account = try? await servers.client(for: server).account(), !account.isAnonymous
+        else { return 0 }
+        var candidates: [(topic: String, displayName: String?)] = (account.reservations ?? []).map { ($0.topic, nil) }
+        for synced in account.subscriptions ?? [] where ServerURL.normalize(synced.baseURL) == server {
+            candidates.append((synced.topic, synced.displayName))
+        }
+        let tints = TopicTint.allCases
+        let symbols = Subscription.symbolChoices
+        var added = 0
+        for candidate in candidates where store.subscription(baseURL: server, topic: candidate.topic) == nil {
+            container.mainContext.insert(Subscription(
+                baseURL: server, topic: candidate.topic, displayName: candidate.displayName,
+                symbol: symbols[(added * 5 + 1) % symbols.count], tint: tints[(added * 3) % tints.count]
+            ))
+            added += 1
+        }
+        guard added > 0 else { return 0 }
+        try? container.mainContext.save()
+        for subscription in store.subscriptions() where subscription.serverURL == server {
+            await refresh(subscription)
+        }
+        await subscriptionsChanged()
+        await requestNotificationPermission()
+        return added
     }
 
     func unsubscribe(_ subscription: Subscription) async {
@@ -169,6 +200,7 @@ final class AppModel {
         watch.send(configuration: configuration, snapshot: snapshot)
     }
 
+    /// Asked after content is loaded, since the system prompt blocks until answered.
     private func requestNotificationPermission() async {
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
     }

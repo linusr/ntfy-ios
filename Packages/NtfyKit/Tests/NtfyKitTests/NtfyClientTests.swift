@@ -72,8 +72,26 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
 
     @Test func serverErrorIsSurfaced() async {
         StubProtocol.handler = { _ in (403, Data(#"{"code":40301,"http":403,"error":"forbidden"}"#.utf8)) }
-        await #expect(throws: NtfyError.http(status: 403, message: "forbidden")) {
+        await #expect(throws: NtfyError.http(status: 403, message: "forbidden", code: 40301)) {
             try await client.poll(topic: "t")
+        }
+    }
+
+    @Test(arguments: [
+        (404, #"{"code":40401,"http":404,"error":"page not found"}"#),
+        (400, #"{"code":40010,"http":400,"error":"invalid request: topic name is not allowed"}"#),
+    ])
+    func registerDeviceDetectsServersWithoutAPNs(status: Int, body: String) async {
+        StubProtocol.handler = { _ in (status, Data(body.utf8)) }
+        await #expect(throws: NtfyError.apnsUnavailable) {
+            try await client.registerDevice(token: "abcd", environment: .production, topics: ["a"])
+        }
+    }
+
+    @Test func registerDeviceSurfacesOtherErrors() async {
+        StubProtocol.handler = { _ in (403, Data(#"{"code":40301,"http":403,"error":"forbidden"}"#.utf8)) }
+        await #expect(throws: NtfyError.http(status: 403, message: "forbidden", code: 40301)) {
+            try await client.registerDevice(token: "abcd", environment: .production, topics: ["a"])
         }
     }
 

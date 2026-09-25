@@ -35,7 +35,7 @@ final class PushRegistrar {
             do {
                 try await directory.client(for: server).registerDevice(token: token, environment: environment, topics: topics)
                 status[server] = .registered
-            } catch NtfyError.http(status: 404, _) {
+            } catch NtfyError.apnsUnavailable {
                 status[server] = .unsupported
             } catch {
                 status[server] = .failed(error.localizedDescription)

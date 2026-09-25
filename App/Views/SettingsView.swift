@@ -241,6 +241,7 @@ struct AddServerView: View {
                 try await NtfyClient(baseURL: url, credential: credential).verify()
                 try servers.add(url, credential: credential)
                 await model.registerForPush()
+                await model.importTopics(from: url)
                 dismiss()
             } catch {
                 self.error = error.localizedDescription

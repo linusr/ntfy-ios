@@ -15,15 +15,20 @@ public enum ServerCredential: Codable, Hashable, Sendable {
 }
 
 public enum NtfyError: LocalizedError, Equatable {
-    case http(status: Int, message: String?)
+    /// `code` is ntfy's error code from the JSON body, e.g. 40010, when the server sent one.
+    case http(status: Int, message: String?, code: Int?)
+    /// The server does not accept APNs registrations: not the APNs fork, or APNs not configured.
+    case apnsUnavailable
     case invalidResponse
 
     public var errorDescription: String? {
         switch self {
-        case let .http(status, message?):
+        case let .http(status, message?, _):
             "\(message) (HTTP \(status))"
-        case let .http(status, nil):
+        case let .http(status, nil, _):
             HTTPURLResponse.localizedString(forStatusCode: status).capitalized + " (HTTP \(status))"
+        case .apnsUnavailable:
+            "This server does not support APNs push."
         case .invalidResponse:
             "The server sent an unexpected response."
         }
@@ -77,13 +82,24 @@ public struct NtfyClient: Sendable {
     }
 
     /// Registers the device for APNs delivery of the given topics, replacing any earlier topic list.
+    /// Throws `apnsUnavailable` for servers without APNs support.
     public func registerDevice(token: String, environment: PushEnvironment, topics: [String]) async throws {
         struct Body: Encodable { let token: String; let environment: PushEnvironment; let topics: [String] }
         var request = makeRequest(url: baseURL.appending(path: "v1/apns"), method: "POST")
         request.httpBody = try JSONEncoder().encode(Body(token: token, environment: environment, topics: topics))
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try await send(request)
+        do {
+            try await send(request)
+        } catch NtfyError.http(status: 404, _, _) {
+            // The APNs fork answers 404 when apns-key-file is not set
+            throw NtfyError.apnsUnavailable
+        } catch NtfyError.http(status: 400, _, code: Self.topicDisallowedCode) {
+            // Stock ntfy routes POST /v1/apns as a message update in the reserved topic "v1"
+            throw NtfyError.apnsUnavailable
+        }
     }
+
+    private static let topicDisallowedCode = 40010
 
     public func unregisterDevice(token: String) async throws {
         struct Body: Encodable { let token: String }
@@ -148,7 +164,7 @@ public struct NtfyClient: Sendable {
                 do {
                     let (bytes, response) = try await session.bytes(for: streamRequest)
                     guard let http = response as? HTTPURLResponse else { throw NtfyError.invalidResponse }
-                    guard (200..<300).contains(http.statusCode) else { throw NtfyError.http(status: http.statusCode, message: nil) }
+                    guard (200..<300).contains(http.statusCode) else { throw NtfyError.http(status: http.statusCode, message: nil, code: nil) }
                     let decoder = JSONDecoder()
                     for try await line in bytes.lines {
                         if let message = try? decoder.decode(Message.self, from: Data(line.utf8)), message.kind == .message {
@@ -192,9 +208,9 @@ public struct NtfyClient: Sendable {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NtfyError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
-            struct ServerError: Decodable { let error: String }
-            let message = try? JSONDecoder().decode(ServerError.self, from: data).error
-            throw NtfyError.http(status: http.statusCode, message: message)
+            struct ServerError: Decodable { let error: String; let code: Int? }
+            let body = try? JSONDecoder().decode(ServerError.self, from: data)
+            throw NtfyError.http(status: http.statusCode, message: body?.error, code: body?.code)
         }
         return data
     }

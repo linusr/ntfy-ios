@@ -102,9 +102,9 @@ struct AddTopicView: View {
             do {
                 try await model.subscribe(server: server, topic: topic, displayName: displayName.isEmpty ? nil : displayName, symbol: symbol, tint: tint, reserve: isSignedIn ? reservation : nil)
                 dismiss()
-            } catch NtfyError.http(status: 409, _) {
+            } catch NtfyError.http(status: 409, _, _) {
                 error = String(localized: "This topic is already reserved by another user.")
-            } catch NtfyError.http(status: 401, _) {
+            } catch NtfyError.http(status: 401, _, _) {
                 error = String(localized: "Your account cannot reserve topics. Choose \"Don't reserve\", or ask the server admin for a tier with reservations.")
             } catch {
                 self.error = error.localizedDescription
