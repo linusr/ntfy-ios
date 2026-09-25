@@ -4,6 +4,24 @@ A native iOS and watchOS client for self-hosted [ntfy](https://ntfy.sh) servers 
 Notification service directly. It requires a server built from the [`apns` branch](https://github.com/linusr/ntfy/tree/apns)
 of the ntfy fork; servers without APNs still work, but messages only arrive when the app refreshes.
 
+## Server compatibility
+
+| Feature | Fork (`apns` branch) | Upstream ntfy |
+|---|---|---|
+| Servers, sign-in, subscriptions, history, refresh | ✅ | ✅ |
+| Publishing, action buttons, attachments, markdown | ✅ | ✅ |
+| Instant push notifications | ✅ | ❌ No `/v1/apns` endpoint; Settings shows "APNs not enabled on server" |
+
+On upstream servers, messages arrive when the app opens or refreshes. Upstream's iOS relay (`upstream-base-url` through
+ntfy.sh and Firebase) targets the official ntfy app's bundle ID and does not reach this app.
+
+Push works only between a server and an app build that share an Apple Developer team: the server signs pushes with the
+team's APNs key for the app's bundle ID.
+
+Instant push on stock ntfy servers depends on the APNs support being accepted upstream. The server change is
+self-contained (the `apns` package and opt-in `apns-*` options) and is a candidate for an upstream pull request; it is
+not currently proposed.
+
 ## Requirements
 
 - Xcode 27, iOS 26+, watchOS 26+
