@@ -8,6 +8,7 @@ struct TopicView: View {
     @Environment(\.modelContext) private var context
     @State private var isComposing = false
     @State private var isEditing = false
+    @State private var isAddingDevice = false
 
     private var days: [(day: Date, messages: [StoredMessage])] {
         let calendar = Calendar.current
@@ -66,9 +67,9 @@ struct TopicView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis") {
                     Button("Edit Topic", systemImage: "pencil") { isEditing = true }
+                    Button("Add Device Key", systemImage: "key") { isAddingDevice = true }
                     Button(subscription.isMuted ? "Unmute" : "Mute", systemImage: subscription.isMuted ? "bell" : "bell.slash") {
-                        subscription.isMuted.toggle()
-                        Task { await model.registerForPush() }
+                        Task { await model.setMuted(subscription, !subscription.isMuted) }
                     }
                     ShareLink(item: subscription.serverURL.appending(path: subscription.topic)) {
                         Label("Share Topic URL", systemImage: "square.and.arrow.up")
@@ -78,6 +79,7 @@ struct TopicView: View {
         }
         .sheet(isPresented: $isComposing) { ComposeView(subscription: subscription) }
         .sheet(isPresented: $isEditing) { EditTopicView(subscription: subscription) }
+        .sheet(isPresented: $isAddingDevice) { DeviceKeyView(subscription: subscription) }
     }
 }
 

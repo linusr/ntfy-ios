@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        BackgroundRefresh.register(model: model)
         application.registerForRemoteNotifications()
         return true
     }
@@ -29,7 +30,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         center.removeDeliveredNotifications(withIdentifiers: matching.map(\.request.identifier))
         if let subscription = model.store.subscription(baseURL: payload.baseURL, topic: message.topic) {
             model.store.apply([message], to: subscription)
-            await model.updateBadge()
+            await model.publish()
         }
         return .newData
     }

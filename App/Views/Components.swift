@@ -2,21 +2,7 @@ import SwiftUI
 import NtfyKit
 
 extension TopicTint {
-    var color: Color {
-        switch self {
-        case .blue: .blue
-        case .indigo: .indigo
-        case .purple: .purple
-        case .pink: .pink
-        case .red: .red
-        case .orange: .orange
-        case .yellow: .yellow
-        case .green: .green
-        case .mint: .mint
-        case .teal: .teal
-        case .gray: .gray
-        }
-    }
+    var color: Color { TopicStyle.color(rawValue) }
 }
 
 struct TopicIcon: View {

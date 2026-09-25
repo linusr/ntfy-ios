@@ -21,6 +21,11 @@ struct RootView: View {
                     ContentUnavailableView("Select a Topic", systemImage: "bell.badge")
                 }
             }
+            #if DEBUG
+            .sheet(item: Binding(get: { router.debugScreen.map(DebugScreen.init) }, set: { router.debugScreen = $0?.id })) { screen in
+                screen.view(server: servers.defaultServer, subscription: subscriptions.first)
+            }
+            #endif
         }
     }
 }
@@ -58,3 +63,25 @@ struct OnboardingView: View {
         }
     }
 }
+
+#if DEBUG
+@MainActor
+private struct DebugScreen: Identifiable {
+    let id: String
+
+    @ViewBuilder
+    func view(server: URL?, subscription: Subscription?) -> some View {
+        if id == "browse", let server {
+            NavigationStack { BrowseTopicsView(server: server) }
+        } else if id == "tokens", let server {
+            NavigationStack { AccessTokensView(server: server) }
+        } else if id == "devicekey", let subscription {
+            DeviceKeyView(subscription: subscription)
+        } else if id == "addtopic" {
+            AddTopicView()
+        } else {
+            Text("Unknown screen \(id)")
+        }
+    }
+}
+#endif

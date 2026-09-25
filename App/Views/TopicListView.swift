@@ -24,8 +24,7 @@ struct TopicListView: View {
                             pendingUnsubscribe = subscription
                         }
                         Button(subscription.isMuted ? "Unmute" : "Mute", systemImage: subscription.isMuted ? "bell" : "bell.slash") {
-                            subscription.isMuted.toggle()
-                            Task { await model.registerForPush() }
+                            Task { await model.setMuted(subscription, !subscription.isMuted) }
                         }
                         .tint(.indigo)
                     }

@@ -11,6 +11,10 @@ struct AddTopicView: View {
     @State private var symbol = "bell.fill"
     @State private var tint = TopicTint.blue
     @State private var isSubscribing = false
+    @State private var reservation: TopicAccess? = .denyAll
+    @State private var error: String?
+
+    private var isSignedIn: Bool { server.map { servers.credential(for: $0) != nil } ?? false }
 
     private var isValid: Bool {
         topic.wholeMatch(of: /[-_A-Za-z0-9]{1,64}/) != nil && server != nil
@@ -40,9 +44,35 @@ struct AddTopicView: View {
                 } footer: {
                     Text("Letters, numbers, dashes and underscores. Anyone who knows the name of an unprotected topic can publish to it.")
                 }
+                if isSignedIn {
+                    Section {
+                        Picker("Reserve", selection: $reservation) {
+                            Text("Don't reserve").tag(TopicAccess?.none)
+                            ForEach(TopicAccess.allCases) { Text($0.label).tag(Optional($0)) }
+                        }
+                    } header: {
+                        Text("Access")
+                    } footer: {
+                        Text(reservation == nil
+                             ? "Anyone who knows the name can use this topic, subject to the server's access rules."
+                             : "Reserves the topic for your account. Other users get the chosen access; you and your device keys always have full access.")
+                    }
+                }
                 Section("Appearance") {
                     TextField("Display name (optional)", text: $displayName)
                     TopicAppearancePicker(symbol: $symbol, tint: $tint)
+                }
+                if let server {
+                    Section {
+                        NavigationLink {
+                            BrowseTopicsView(server: server)
+                        } label: {
+                            Label("Browse Existing Topics", systemImage: "list.bullet.rectangle")
+                        }
+                    }
+                }
+                if let error {
+                    Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
                 }
             }
             .navigationTitle("Add Topic")
@@ -67,9 +97,19 @@ struct AddTopicView: View {
     private func subscribe() {
         guard let server else { return }
         isSubscribing = true
+        error = nil
         Task {
-            await model.subscribe(server: server, topic: topic, displayName: displayName.isEmpty ? nil : displayName, symbol: symbol, tint: tint)
-            dismiss()
+            do {
+                try await model.subscribe(server: server, topic: topic, displayName: displayName.isEmpty ? nil : displayName, symbol: symbol, tint: tint, reserve: isSignedIn ? reservation : nil)
+                dismiss()
+            } catch NtfyError.http(status: 409, _) {
+                error = String(localized: "This topic is already reserved by another user.")
+            } catch NtfyError.http(status: 401, _) {
+                error = String(localized: "Your account cannot reserve topics. Choose \"Don't reserve\", or ask the server admin for a tier with reservations.")
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isSubscribing = false
         }
     }
 }

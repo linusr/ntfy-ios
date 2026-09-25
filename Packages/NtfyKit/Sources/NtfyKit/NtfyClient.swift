@@ -99,6 +99,71 @@ public struct NtfyClient: Sendable {
         try await send(makeRequest(url: baseURL.appending(path: path), method: "GET"))
     }
 
+    public func account() async throws -> Account {
+        try await JSONDecoder().decode(Account.self, from: send(makeRequest(url: baseURL.appending(path: "v1/account"), method: "GET")))
+    }
+
+    /// All users and their grants. Requires an admin account.
+    public func users() async throws -> [ServerUser] {
+        try await JSONDecoder().decode([ServerUser].self, from: send(makeRequest(url: baseURL.appending(path: "v1/users"), method: "GET")))
+    }
+
+    /// Reserves a topic for the signed-in user; `everyone` is the access left to all other users.
+    public func reserve(topic: String, everyone: TopicAccess) async throws {
+        struct Body: Encodable { let topic: String; let everyone: TopicAccess }
+        var request = makeRequest(url: baseURL.appending(path: "v1/account/reservation"), method: "POST")
+        request.httpBody = try JSONEncoder().encode(Body(topic: topic, everyone: everyone))
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try await send(request)
+    }
+
+    /// Creates an access token on the signed-in account; it carries all of the account's permissions.
+    /// A nil `expires` creates a token that never expires.
+    public func createToken(label: String, expires: Date?) async throws -> Account.Token {
+        struct Body: Encodable { let label: String; let expires: Int64 }
+        var request = makeRequest(url: baseURL.appending(path: "v1/account/token"), method: "POST")
+        // The server treats 0 as "never" but applies a 72-hour default when the field is absent
+        request.httpBody = try JSONEncoder().encode(Body(label: label, expires: expires.map { Int64($0.timeIntervalSince1970) } ?? 0))
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return try await JSONDecoder().decode(Account.Token.self, from: send(request))
+    }
+
+    public func deleteToken(_ token: String) async throws {
+        var request = makeRequest(url: baseURL.appending(path: "v1/account/token"), method: "DELETE")
+        request.setValue(token, forHTTPHeaderField: "X-Token")
+        try await send(request)
+    }
+
+    /// Streams new messages for the topics until cancelled. The server sends keepalives, so a
+    /// stalled connection surfaces as a timeout error for the caller to reconnect.
+    public func stream(topics: [String], since: String?) -> AsyncThrowingStream<Message, Error> {
+        var query = [URLQueryItem]()
+        if let since { query.append(URLQueryItem(name: "since", value: since)) }
+        var request = makeRequest(url: baseURL.appending(path: "\(topics.joined(separator: ","))/json").appending(queryItems: query), method: "GET")
+        request.timeoutInterval = 90
+        let streamRequest = request
+        let session = self.session
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let (bytes, response) = try await session.bytes(for: streamRequest)
+                    guard let http = response as? HTTPURLResponse else { throw NtfyError.invalidResponse }
+                    guard (200..<300).contains(http.statusCode) else { throw NtfyError.http(status: http.statusCode, message: nil) }
+                    let decoder = JSONDecoder()
+                    for try await line in bytes.lines {
+                        if let message = try? decoder.decode(Message.self, from: Data(line.utf8)), message.kind == .message {
+                            continuation.yield(message)
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     /// Performs an ntfy "http" action button.
     public func perform(_ action: Action) async throws {
         guard let urlString = action.url, let url = URL(string: urlString) else { throw NtfyError.invalidResponse }

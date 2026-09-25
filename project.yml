@@ -39,6 +39,7 @@ targets:
     dependencies:
       - package: NtfyKit
       - target: NotificationService
+      - target: Widgets
       - target: NtfyWatch
     settings:
       base:
@@ -52,7 +53,11 @@ targets:
         NtfyAppGroup: $(APP_GROUP)
         NtfyPushEnvironment: $(PUSH_ENVIRONMENT)
         UILaunchScreen: {}
-        UIBackgroundModes: [remote-notification]
+        UIBackgroundModes: [remote-notification, fetch]
+        BGTaskSchedulerPermittedIdentifiers: [$(APP_BUNDLE_ID).refresh]
+        CFBundleURLTypes:
+          - CFBundleURLName: $(APP_BUNDLE_ID)
+            CFBundleURLSchemes: [ntfy-app]
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
@@ -87,6 +92,28 @@ targets:
       properties:
         com.apple.security.application-groups: [$(APP_GROUP)]
 
+  Widgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets
+    dependencies:
+      - package: NtfyKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).Widgets
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: ntfy Widgets
+        NtfyAppGroup: $(APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Widgets/Widgets.entitlements
+      properties:
+        com.apple.security.application-groups: [$(APP_GROUP)]
+
   NtfyWatch:
     type: application
     platform: watchOS
@@ -94,6 +121,7 @@ targets:
       - Watch
     dependencies:
       - package: NtfyKit
+      - target: WatchWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).watchkitapp
@@ -105,6 +133,33 @@ targets:
         CFBundleDisplayName: ntfy
         WKApplication: true
         WKCompanionAppBundleIdentifier: $(APP_BUNDLE_ID)
+        NtfyAppGroup: $(APP_GROUP)
+    entitlements:
+      path: Watch/NtfyWatch.entitlements
+      properties:
+        com.apple.security.application-groups: [$(APP_GROUP)]
+
+  WatchWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - WatchWidgets
+    dependencies:
+      - package: NtfyKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).watchkitapp.Widgets
+    info:
+      path: WatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: ntfy Complications
+        NtfyAppGroup: $(APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: WatchWidgets/WatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [$(APP_GROUP)]
 
 schemes:
   Ntfy:

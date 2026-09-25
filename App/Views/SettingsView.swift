@@ -111,6 +111,20 @@ private struct ServerDetailView: View {
                 LabeledContent("URL", value: server.absoluteString)
                 LabeledContent("Sign-in", value: credentialLabel)
             }
+            Section {
+                NavigationLink {
+                    BrowseTopicsView(server: server)
+                } label: {
+                    Label("Browse Topics", systemImage: "list.bullet.rectangle")
+                }
+                if servers.credential(for: server) != nil {
+                    NavigationLink {
+                        AccessTokensView(server: server)
+                    } label: {
+                        Label("Access Tokens", systemImage: "key")
+                    }
+                }
+            }
             if server != servers.defaultServer {
                 Button("Make Default") { servers.makeDefault(server) }
             }

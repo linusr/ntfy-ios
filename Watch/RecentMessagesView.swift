@@ -6,31 +6,49 @@ struct RecentMessagesView: View {
 
     var body: some View {
         NavigationStack {
-            List(store.entries) { entry in
-                NavigationLink {
-                    MessageDetailView(entry: entry)
-                } label: {
-                    MessageRow(entry: entry)
+            List {
+                ForEach(store.entries) { entry in
+                    NavigationLink {
+                        MessageDetailView(entry: entry)
+                    } label: {
+                        MessageRow(entry: entry)
+                    }
+                }
+                if let error = store.lastError {
+                    Text(error).font(.footnote).foregroundStyle(.red)
                 }
             }
             .navigationTitle("ntfy")
-            .overlay {
-                if store.entries.isEmpty {
-                    ContentUnavailableView("No Messages", systemImage: "bell", description: Text("Messages from your iPhone appear here."))
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Refresh", systemImage: "arrow.clockwise") {
+                        Task { await store.refresh() }
+                    }
+                    .disabled(store.isRefreshing || !store.hasConfiguration)
                 }
             }
+            .overlay {
+                if store.entries.isEmpty {
+                    ContentUnavailableView(
+                        "No Messages",
+                        systemImage: "bell",
+                        description: Text(store.hasConfiguration ? "Messages from the last day appear here." : "Open ntfy on your iPhone to set up the watch.")
+                    )
+                }
+            }
+            .task { await store.refresh() }
         }
     }
 }
 
 private struct MessageRow: View {
-    let entry: WatchSnapshot.Entry
+    let entry: RecentSnapshot.Entry
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: entry.symbol)
-                    .foregroundStyle(tintColor(entry.tint))
+                    .foregroundStyle(TopicStyle.color(entry.tint))
                 Text(entry.topicTitle)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -49,15 +67,13 @@ private struct MessageRow: View {
     }
 
     private var heading: String? {
-        let emoji = entry.message.emojiTags.joined()
-        let title = entry.message.title ?? ""
-        let text = [emoji, title].filter { !$0.isEmpty }.joined(separator: " ")
+        let text = [entry.message.emojiTags.joined(), entry.message.title ?? ""].filter { !$0.isEmpty }.joined(separator: " ")
         return text.isEmpty ? nil : text
     }
 }
 
 private struct MessageDetailView: View {
-    let entry: WatchSnapshot.Entry
+    let entry: RecentSnapshot.Entry
 
     var body: some View {
         ScrollView {
@@ -66,6 +82,9 @@ private struct MessageDetailView: View {
                     Text(entry.message.emojiTags.joined() + " " + title).font(.headline)
                 }
                 Text(NotificationFormatter.bodyText(entry.message))
+                if !entry.message.textTags.isEmpty {
+                    Text(entry.message.textTags.joined(separator: " · ")).font(.caption2).foregroundStyle(.secondary)
+                }
                 Text(entry.message.date, format: .dateTime.weekday().hour().minute())
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -73,21 +92,5 @@ private struct MessageDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(entry.topicTitle)
-    }
-}
-
-private func tintColor(_ name: String) -> Color {
-    switch name {
-    case "indigo": .indigo
-    case "purple": .purple
-    case "pink": .pink
-    case "red": .red
-    case "orange": .orange
-    case "yellow": .yellow
-    case "green": .green
-    case "mint": .mint
-    case "teal": .teal
-    case "gray": .gray
-    default: .blue
     }
 }

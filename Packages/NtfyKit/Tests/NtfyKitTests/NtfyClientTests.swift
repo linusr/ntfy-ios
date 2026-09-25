@@ -86,4 +86,67 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         #expect(request.value(forHTTPHeaderField: "X-Tags") == "tada")
         #expect(String(data: try #require(request.httpBody), encoding: .utf8) == "hello")
     }
+
+    @Test func accountDecodes() async throws {
+        StubProtocol.handler = { _ in (200, Data("""
+        {"username":"ben","role":"admin","sync_topic":"st","subscriptions":[{"base_url":"https://ntfy.example.com","topic":"backups","display_name":null}],
+         "reservations":[{"topic":"alerts","everyone":"deny-all"}],"tokens":[{"token":"tk_abc","label":"garage","last_access":1727200000,"expires":0}]}
+        """.utf8)) }
+        let account = try await client.account()
+        #expect(account.isAdmin)
+        #expect(account.reservations == [Account.Reservation(topic: "alerts", everyone: .denyAll)])
+        #expect(account.subscriptions?.first?.topic == "backups")
+        #expect(account.tokens?.first?.label == "garage")
+        #expect(account.tokens?.first?.expiryDate == nil)
+        #expect(account.tokens?.first?.lastAccessDate != nil)
+    }
+
+    @Test func reserveSendsAccessLevel() async throws {
+        try await client.reserve(topic: "alerts", everyone: .writeOnly)
+        let request = try #require(StubProtocol.requests.first)
+        #expect(request.url?.path() == "/v1/account/reservation")
+        let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: Any]
+        #expect(body?["everyone"] as? String == "write-only")
+    }
+
+    @Test func createAndDeleteToken() async throws {
+        StubProtocol.handler = { _ in (200, Data(#"{"token":"tk_new","label":"garage","expires":1800000000}"#.utf8)) }
+        let token = try await client.createToken(label: "garage", expires: Date(timeIntervalSince1970: 1_800_000_000))
+        #expect(token.token == "tk_new")
+        let body = try JSONSerialization.jsonObject(with: try #require(StubProtocol.requests.first?.httpBody)) as? [String: Any]
+        #expect(body?["expires"] as? Int == 1_800_000_000)
+
+        _ = try await client.createToken(label: "forever", expires: nil)
+        let neverBody = try JSONSerialization.jsonObject(with: try #require(StubProtocol.requests.last?.httpBody)) as? [String: Any]
+        #expect(neverBody?["expires"] as? Int == 0)
+
+        try await client.deleteToken("tk_new")
+        let delete = try #require(StubProtocol.requests.last)
+        #expect(delete.httpMethod == "DELETE")
+        #expect(delete.value(forHTTPHeaderField: "X-Token") == "tk_new")
+    }
+
+    @Test func usersDecodeGrants() async throws {
+        StubProtocol.handler = { _ in (200, Data(#"[{"username":"ben","role":"user","grants":[{"topic":"backups_*","permission":"read-only"}]},{"username":"*","role":"anonymous"}]"#.utf8)) }
+        let users = try await client.users()
+        #expect(users.count == 2)
+        #expect(users[0].grants == [ServerUser.Grant(topic: "backups_*", permission: .readOnly)])
+        #expect(users[1].grants == nil)
+    }
+
+    @Test func streamYieldsMessages() async throws {
+        StubProtocol.handler = { _ in (200, Data("""
+        {"id":"o","time":1,"event":"open","topic":"a,b"}
+        {"id":"m1","time":2,"event":"message","topic":"a","message":"one"}
+        {"id":"k","time":3,"event":"keepalive","topic":"a,b"}
+        {"id":"m2","time":4,"event":"message","topic":"b","message":"two"}
+
+        """.utf8)) }
+        var ids: [String] = []
+        for try await message in client.stream(topics: ["a", "b"], since: "xyz") {
+            ids.append(message.id)
+        }
+        #expect(ids == ["m1", "m2"])
+        #expect(StubProtocol.requests.first?.url?.path() == "/a,b/json")
+    }
 }

@@ -4,6 +4,26 @@ A native iOS and watchOS client for self-hosted [ntfy](https://ntfy.sh) servers 
 Notification service directly. It requires a server built from the [`apns` branch](https://github.com/linusr/ntfy/tree/apns)
 of the ntfy fork; servers without APNs still work, but messages only arrive when the app refreshes.
 
+## Features
+
+- Topics across multiple servers, with markdown, priorities, tags, attachments and action buttons
+- Browse a server's topics: your reservations, subscriptions synced from the web app and, for admins, every user's grants
+- Create topics with a reservation (private, read-only, write-only or public for other users)
+- Device keys: labeled access tokens with optional expiry, a ready-to-use `curl` command, and revocation
+- Home and Lock Screen widgets with recent notifications
+- Apple Watch app that fetches messages itself, with complications for the latest message and unread count
+
+## Delivery
+
+| Mode | When | Latency |
+|---|---|---|
+| APNs push | Server runs the fork with an APNs key for this app's team | Instant |
+| Live stream | App in the foreground | Instant |
+| Background refresh | App in the background, no APNs | iOS schedules it, from about 15 minutes to hours |
+
+Background refresh posts local notifications for new messages on topics whose server is not registered for APNs, so
+both paths never notify twice. Notifications on the iPhone are mirrored to the watch.
+
 ## Server compatibility
 
 | Feature | Fork (`apns` branch) | Upstream ntfy |
@@ -25,7 +45,8 @@ not currently proposed.
 ## Requirements
 
 - Xcode 27, iOS 26+, watchOS 26+
-- An Apple Developer Program membership (push notifications, app groups and time-sensitive notifications need a paid team)
+- An Apple Account for signing. A free account covers everything except APNs push, which needs an auth key from the
+  paid Apple Developer Program; without it the app runs on the live stream and background refresh
 - [mise](https://mise.jdx.dev), which installs the pinned XcodeGen
 
 ## Setup
@@ -59,7 +80,9 @@ Debug builds register with the APNs sandbox and Release builds (TestFlight, App 
 | `Packages/NtfyKit` | Shared models, API client, keychain credentials, push payload parsing, notification formatting |
 | `App` | iOS app: SwiftData storage, sync, APNs registration, SwiftUI views |
 | `NotificationService` | Formats each push, resolves `poll_request` payloads, adds action buttons and images |
-| `Watch` | watchOS app showing recent messages synced from the iPhone |
+| `Widgets` | Home and Lock Screen widgets reading the snapshot the app writes to the app group |
+| `Watch` | watchOS app: receives servers and topics from the iPhone, then polls the servers directly |
+| `WatchWidgets` | Watch complications |
 
 The notification service extension never writes the app's database. It drops each message into an app-group inbox,
 which the app imports on launch, so the two processes never share a store.
@@ -72,7 +95,21 @@ xcodebuild -project Ntfy.xcodeproj -scheme Ntfy -destination 'generic/platform=i
 ```
 
 Debug builds accept launch arguments that add a server and topics without going through onboarding:
-`-seedServer http://localhost:8080 -seedTopics backups,alerts -openTopic alerts`.
+
+```
+-seedServer http://localhost:8080 -seedUser ben -seedPassword pw -seedTopics backups,alerts
+-openTopic alerts
+-openScreen browse|tokens|devicekey|addtopic
+```
+
+The watch app accepts the same `-seed*` arguments. Simulator builds signed without a team are not matched as
+WatchConnectivity counterparts, so the phone cannot configure the watch there.
+
+To run background refresh on demand, pause the app in the Xcode debugger and run:
+
+```
+e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"me.4vr.ntfy.refresh"]
+```
 
 `xcrun simctl push` delivers to Notification Center without running the notification service extension, so
 extension behavior needs a device.

@@ -4,7 +4,8 @@ import NtfyKit
 import UserNotifications
 
 /// Launch arguments for simulator runs and screenshots:
-/// `-seedServer http://localhost:8080 -seedTopics backups,alerts -openTopic alerts`
+/// `-seedServer http://localhost:8080 -seedUser ben -seedPassword pw -seedTopics backups,alerts -openTopic alerts`,
+/// plus `-openScreen browse|tokens|devicekey|addtopic` to open a screen directly.
 @MainActor
 enum DebugSeed {
     static func apply(to model: AppModel) async {
@@ -12,7 +13,8 @@ enum DebugSeed {
         guard let server = defaults.string(forKey: "seedServer").flatMap(URL.init(string:)) else { return }
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge, .provisional])
         if !model.servers.servers.contains(server) {
-            try? model.servers.add(server, credential: nil)
+            let credential = defaults.string(forKey: "seedUser").map { ServerCredential.basic(username: $0, password: defaults.string(forKey: "seedPassword") ?? "") }
+            try? model.servers.add(server, credential: credential)
         }
         let existing = Set(model.store.subscriptions().map(\.topic))
         let tints = TopicTint.allCases
@@ -23,6 +25,10 @@ enum DebugSeed {
         try? model.container.mainContext.save()
         if let topic = defaults.string(forKey: "openTopic"), model.router.selectedTopicKey == nil {
             model.router.selectedTopicKey = topicKey(baseURL: server, topic: topic)
+        }
+        if let screen = defaults.string(forKey: "openScreen"), model.router.debugScreen == nil {
+            model.router.debugScreen = screen
+            defaults.removeObject(forKey: "openScreen")
         }
     }
 }

@@ -13,12 +13,24 @@ struct NtfyApp: App {
                 .environment(delegate.model.push)
                 .environment(delegate.model.router)
                 .modelContainer(delegate.model.container)
+                .onOpenURL { url in
+                    delegate.model.router.open(url)
+                }
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task {
-                await delegate.model.refreshAll()
-                await delegate.model.registerForPush()
+            let model = delegate.model
+            switch phase {
+            case .active:
+                Task {
+                    await model.refreshAll()
+                    await model.registerForPush()
+                    model.setLiveUpdates(active: true)
+                }
+            case .background:
+                model.setLiveUpdates(active: false)
+                BackgroundRefresh.schedule()
+            default:
+                break
             }
         }
     }

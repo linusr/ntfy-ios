@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftData
 import UserNotifications
+import WidgetKit
 import NtfyKit
 
 /// App-wide state and the operations views and notification handling share.
@@ -12,7 +13,8 @@ final class AppModel {
     let servers = ServerDirectory()
     let push = PushRegistrar()
     let router = Router()
-    private let watch = WatchBridge()
+    @ObservationIgnored private lazy var live = LiveUpdates(model: self)
+    @ObservationIgnored private let watch = WatchBridge()
     private(set) var isRefreshing = false
     private(set) var lastError: String?
 
@@ -23,20 +25,32 @@ final class AppModel {
 
     var store: MessageStore { MessageStore(context: container.mainContext) }
 
-    func subscribe(server: URL, topic: String, displayName: String?, symbol: String, tint: TopicTint) async {
-        let subscription = Subscription(baseURL: server, topic: topic, displayName: displayName, symbol: symbol, tint: tint)
-        container.mainContext.insert(subscription)
-        try? container.mainContext.save()
+    /// Subscribes to a topic, first reserving it for the signed-in account when `reserve` is set.
+    func subscribe(server: URL, topic: String, displayName: String?, symbol: String, tint: TopicTint, reserve: TopicAccess? = nil) async throws {
+        if let reserve {
+            try await servers.client(for: server).reserve(topic: topic, everyone: reserve)
+        }
+        if store.subscription(baseURL: server, topic: topic) == nil {
+            container.mainContext.insert(Subscription(baseURL: server, topic: topic, displayName: displayName, symbol: symbol, tint: tint))
+            try? container.mainContext.save()
+        }
         await requestNotificationPermission()
-        await registerForPush()
-        await refresh(subscription)
+        if let subscription = store.subscription(baseURL: server, topic: topic) {
+            await refresh(subscription)
+        }
+        await subscriptionsChanged()
     }
 
     func unsubscribe(_ subscription: Subscription) async {
         container.mainContext.delete(subscription)
         try? container.mainContext.save()
-        await registerForPush()
-        await updateBadge()
+        await subscriptionsChanged()
+    }
+
+    func setMuted(_ subscription: Subscription, _ muted: Bool) async {
+        subscription.isMuted = muted
+        try? container.mainContext.save()
+        await subscriptionsChanged()
     }
 
     func removeServer(_ server: URL) async {
@@ -44,8 +58,17 @@ final class AppModel {
         try? container.mainContext.save()
         await push.unregister(from: server, directory: servers)
         servers.remove(server)
-        await updateBadge()
+        await subscriptionsChanged()
     }
+
+    /// Pushes topic changes to everything that depends on the subscription list.
+    func subscriptionsChanged() async {
+        await registerForPush()
+        live.restart()
+        await publish()
+    }
+
+    // MARK: Delivery
 
     /// Imports pushed messages, then fetches anything missed from each server.
     func refreshAll() async {
@@ -59,17 +82,49 @@ final class AppModel {
         for subscription in store.subscriptions() {
             await refresh(subscription)
         }
-        await updateBadge()
-        sendWatchSnapshot()
+        await publish()
     }
 
-    func refresh(_ subscription: Subscription) async {
+    @discardableResult
+    func refresh(_ subscription: Subscription) async -> [Message] {
         do {
             let messages = try await servers.client(for: subscription.serverURL).poll(topic: subscription.topic, since: subscription.lastMessageID)
-            store.apply(messages, to: subscription)
+            return store.apply(messages, to: subscription)
         } catch {
             lastError = "\(subscription.title): \(error.localizedDescription)"
+            return []
         }
+    }
+
+    /// Applies messages received on the live stream.
+    func receive(_ message: Message, from server: URL) async {
+        guard let subscription = store.subscription(baseURL: server, topic: message.topic) else { return }
+        guard !store.apply([message], to: subscription).isEmpty else { return }
+        if router.selectedTopicKey == subscription.key {
+            store.markAllRead(subscription)
+        }
+        await publish()
+    }
+
+    /// Background refresh: polls every topic and posts local notifications for new messages on topics
+    /// whose server does not deliver them through APNs.
+    func backgroundRefresh() async -> Bool {
+        store.ingestInbox()
+        var delivered = false
+        for subscription in store.subscriptions() {
+            let fresh = await refresh(subscription)
+            guard !fresh.isEmpty, !subscription.isMuted, push.status[subscription.serverURL] != .registered else { continue }
+            for message in fresh.suffix(5) {
+                await LocalNotifications.post(message, baseURL: subscription.serverURL)
+            }
+            delivered = true
+        }
+        await publish()
+        return delivered
+    }
+
+    func setLiveUpdates(active: Bool) {
+        active ? live.restart() : live.stop()
     }
 
     func registerForPush() async {
@@ -80,29 +135,38 @@ final class AppModel {
         await push.register(topicsByServer: topics, directory: servers)
     }
 
+    // MARK: Read state and publishing
+
     func markRead(_ subscription: Subscription) async {
         store.markAllRead(subscription)
         let center = UNUserNotificationCenter.current()
         let delivered = await center.deliveredNotifications().filter { $0.request.content.threadIdentifier == subscription.key }
         center.removeDeliveredNotifications(withIdentifiers: delivered.map(\.request.identifier))
-        await updateBadge()
+        await publish()
     }
 
-    func sendWatchSnapshot() {
-        let entries = store.subscriptions()
-            .flatMap { subscription in
-                subscription.messages.compactMap { stored in
-                    stored.message.map { WatchSnapshot.Entry(topicTitle: subscription.title, symbol: subscription.symbol, tint: subscription.tint.rawValue, message: $0) }
+    /// Updates the badge, the widgets' snapshot and the watch.
+    func publish() async {
+        let subscriptions = store.subscriptions()
+        let unread = subscriptions.reduce(0) { $0 + $1.unreadCount }
+        try? await UNUserNotificationCenter.current().setBadgeCount(unread)
+
+        let entries = subscriptions.flatMap { subscription in
+            subscription.messages.compactMap { stored in
+                stored.message.map {
+                    RecentSnapshot.Entry(topicKey: subscription.key, topicTitle: subscription.title, symbol: subscription.symbol, tint: subscription.tint.rawValue, message: $0)
                 }
             }
-            .sorted { $0.message.time > $1.message.time }
-            .prefix(WatchSnapshot.entryLimit)
-        watch.send(WatchSnapshot(entries: Array(entries)))
-    }
+        }
+        let snapshot = RecentSnapshot(entries: entries, unreadCount: unread)
+        try? snapshot.save()
+        WidgetCenter.shared.reloadAllTimelines()
 
-    func updateBadge() async {
-        let unread = store.subscriptions().reduce(0) { $0 + $1.unreadCount }
-        try? await UNUserNotificationCenter.current().setBadgeCount(unread)
+        let configuration = WatchConfiguration(
+            servers: servers.servers.map { WatchConfiguration.Server(url: $0, credential: servers.credential(for: $0)) },
+            topics: subscriptions.map { WatchConfiguration.Topic(baseURL: $0.serverURL, topic: $0.topic, title: $0.title, symbol: $0.symbol, tint: $0.tint.rawValue) }
+        )
+        watch.send(configuration: configuration, snapshot: snapshot)
     }
 
     private func requestNotificationPermission() async {

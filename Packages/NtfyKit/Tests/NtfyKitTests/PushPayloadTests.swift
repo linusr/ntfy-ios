@@ -81,3 +81,18 @@ import UserNotifications
         #expect(inbox.drain().isEmpty)
     }
 }
+
+@Suite struct RecentSnapshotTests {
+    @Test func keepsNewestEntriesAndRoundTrips() throws {
+        let entries = (0..<60).map { i in
+            RecentSnapshot.Entry(topicKey: "k", topicTitle: "t", symbol: "bell", tint: "blue", message: Message(id: "m\(i)", time: Int64(i), topic: "t"))
+        }
+        let snapshot = RecentSnapshot(entries: entries, unreadCount: 3)
+        #expect(snapshot.entries.count == RecentSnapshot.entryLimit)
+        #expect(snapshot.entries.first?.message.id == "m59")
+        let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".json")
+        try snapshot.save(to: file)
+        #expect(RecentSnapshot.load(from: file) == snapshot)
+        #expect(RecentSnapshot.load(from: file.appending(path: "missing")) == .empty)
+    }
+}
