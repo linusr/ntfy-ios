@@ -37,34 +37,59 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
+/// UIKit calls these on an arbitrary queue and requires the completion handlers on the main thread, so
+/// the work hops to the main actor and completes there. The async delegate variants would complete on the
+/// cooperative pool instead, which UIKit rejects with an assertion.
 extension AppDelegate: UNUserNotificationCenterDelegate {
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        await presentationOptions(threadIdentifier: notification.request.content.threadIdentifier)
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        let threadIdentifier = notification.request.content.threadIdentifier
+        nonisolated(unsafe) let completionHandler = completionHandler
+        Task { @MainActor in
+            completionHandler(self.model.router.selectedTopicKey == threadIdentifier ? [] : [.banner, .list, .sound])
+            await self.model.refreshAll()
+        }
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
         let request = response.notification.request
-        guard let payload = PushPayload(userInfo: request.content.userInfo) else { return }
-        await handle(payload, actionIdentifier: response.actionIdentifier, requestIdentifier: request.identifier, threadIdentifier: request.content.threadIdentifier)
+        let payload = PushPayload(userInfo: request.content.userInfo)
+        let actionIdentifier = response.actionIdentifier
+        let requestIdentifier = request.identifier
+        let threadIdentifier = request.content.threadIdentifier
+        nonisolated(unsafe) let completionHandler = completionHandler
+        Task { @MainActor in
+            guard let payload else {
+                completionHandler()
+                return
+            }
+            await self.handle(payload, actionIdentifier: actionIdentifier, requestIdentifier: requestIdentifier, threadIdentifier: threadIdentifier, completion: completionHandler)
+        }
     }
 
-    private func presentationOptions(threadIdentifier: String) async -> UNNotificationPresentationOptions {
-        await model.refreshAll()
-        return model.router.selectedTopicKey == threadIdentifier ? [] : [.banner, .list, .sound]
-    }
-
-    private func handle(_ payload: PushPayload, actionIdentifier: String, requestIdentifier: String, threadIdentifier: String) async {
+    /// Navigates first and completes before any network work, so a slow action cannot stall the tap.
+    private func handle(_ payload: PushPayload, actionIdentifier: String, requestIdentifier: String, threadIdentifier: String, completion: () -> Void) async {
         let message = payload.message
         if let action = message.actions?.first(where: { $0.id == actionIdentifier }) {
+            completion()
             await ActionPerformer.perform(action)
             if action.clear == true {
                 UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [requestIdentifier])
             }
             return
         }
-        guard actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
-        model.router.selectedTopicKey = threadIdentifier
-        if let click = message.click, let url = URL(string: click) {
+        if actionIdentifier == UNNotificationDefaultActionIdentifier {
+            model.router.selectedTopicKey = threadIdentifier
+        }
+        completion()
+        if actionIdentifier == UNNotificationDefaultActionIdentifier, let click = message.click, let url = URL(string: click) {
             await UIApplication.shared.open(url)
         }
     }
