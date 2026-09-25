@@ -10,7 +10,7 @@ options:
 settings:
   base:
     # Your 10-character Apple Developer team ID; required for push, app groups and device builds
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: 2NDDPG5773
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"

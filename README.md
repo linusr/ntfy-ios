@@ -13,7 +13,7 @@ of the ntfy fork; servers without APNs still work, but messages only arrive when
 ## Setup
 
 1. Set your team ID and identifiers in `project.yml`:
-   - `DEVELOPMENT_TEAM`: your 10-character team ID
+   - `DEVELOPMENT_TEAM`: your 10-character team ID (currently `2NDDPG5773`)
    - `APP_BUNDLE_ID` and `APP_GROUP`: identifiers registered to your team
 2. In the Apple Developer portal, create an APNs auth key (*Keys → +*, enable Apple Push Notifications service).
 3. Configure the server with that key and the app's bundle ID:
