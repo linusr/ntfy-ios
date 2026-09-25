@@ -105,7 +105,8 @@ Debug builds accept launch arguments that add a server and topics without going 
 The watch app accepts the same `-seed*` arguments. Simulator builds signed without a team are not matched as
 WatchConnectivity counterparts, so the phone cannot configure the watch there.
 
-To run background refresh on demand, pause the app in the Xcode debugger and run:
+Background refresh does not run in the Simulator, which rejects task requests. On a device, send the app to the
+background, pause it in the Xcode debugger and run:
 
 ```
 e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"me.4vr.ntfy.refresh"]
